@@ -1,0 +1,242 @@
+/*----------------------------------------------------------------------------------------
+first project of HVAC 
+Prepared by: Mohammadreza najafi and nazanin saberi
+Supervisor:  Dr. Reza Madahian
+General description of this code:
+This code has been developed to obtain comfort conditions in both fixed and optimise modes 
+If this code is executed, the user will be asked about the desired mode :
+If you want to get the PMV , PPD  for your desired conditions, enter one.
+If you want to get the relationship between speed and temperature in optimal comfort conditions,
+enter 2 and enter the temperature range under consideration (speed range is considered 0< 1.4 IF YOU wanna change it go to 151
+(Selected number for validation with ASHRAE STANDARD)
+The following parameters are requested from the user.
+clo;                       intrinsic clothing insulation  
+met;                       metabolic rate in W/m2
+wme;                       external work in W/m2
+rh;                          humidity
+ta;                          air temperature in c
+tr;                           mean radient temperature in c
+vel;                           air velocity in m/s
+ Tmin                        minimum air temperature C     
+Tmax	                    maxiimum air temperatur C
+after this steps As needed, the output file will be visible in the problem execution folder
+Origin: Faculty of Mechanics, Tarbiat Modares University, Iran
+way of communication:
+Mamadreza9561@gmail.com
+nazanin.saberi1995@gmail.com
+----------------------------------------------------------------------------------------------------*/
+#include <math.h> 
+#include <iomanip>
+#include <iostream> 
+#include <conio.h> 
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <cmath>
+#include <tgmath.h> 
+using namespace std;
+double  ComfortconditionsPMV_PPD(double clo, double met, double wme, double rh,double ta,double tr,double vel) 
+{
+//	Introduction of parameters
+	double m,w,mw,fnps,pa,xn,xf,tra,icl1,fcl,hcf,hc,
+	hcl,hcn,taa,tcla,p1,p2,p3,p4,p5,n,eps,hl1
+	,hl2,hl3,hl4,hl5,hl6,ts,PMV,PPD,tcl;
+	
+	// calculate t_cl
+		fnps=exp(16.6536-4030.183/(ta+235)); //‘ saturated vapor pressure KPa
+		pa=rh*10*fnps;                          //water vapor pressure, Pa
+		icl1=0.155*clo;               // ‘ thermal insulation of the clothing in m2K/W
+		m=met*58.15;                    // metabolic rate in W/m2
+		w=wme*58.15;                         //‘ external work in W/m2
+		mw=m-w;                                     // internal heat production in the human body
+		if (icl1<0.078)
+		{
+			fcl=1+1.29*icl1;                      //‘ clothing area facto
+		}
+		else
+		{
+			fcl=1.05+0.645*icl1;                  //‘ clothing area facto
+		}
+		hcf=12.1*sqrt(vel);                     //‘ heat transf. coefficient by forced convection
+		taa=ta+273;                          // air temperature in Kelvin
+		tra=tr+273;                        //‘ mean radiant temperature in Kelvin
+		tcla=taa+(35.5-ta)/(3.5*((6.45*icl1)+0.1));  //first guess for surface temperature of clothing
+		p1 = icl1 * fcl; // ‘ calculation term
+        p2 = p1 * 3.96;         // ‘ calculation term
+        p3 = p1 * 100;              // ‘ calculation term
+        p4 = p1 * taa;                 // ‘ calculation term
+        p5 = 308.7 - 0.028 * mw +p2 * pow((tra/100),4);      // ‘ calculation term
+        xn = tcla / 100;
+        xf = 0;
+        n =0;
+        eps = 0.0015;
+        xf=xn;
+        do
+        {
+  			xf=(xf+xn)/2;
+			hcn=2.38*(pow(fabs(100*xf-taa),0.25));
+			if (hcf>hcn)
+			{
+				hc=hcf;
+			}
+			else
+			{
+				hc=hcn;
+			}
+			xn=(p5+p4*hc-p2*(pow(xf,4)))/(100+(p3*hc));
+			n=n+1;
+		}
+		while (fabs(xn-xf)>eps && n<=150);
+		tcl=100*xn-273;
+		// the final stage of calculation tcl//
+		//- - - - - - - - - - - - - - - - - - - HEAT LOSS COMPONENTS - - - - - - - - - - - - - - - - - - - - - - - - -//
+        hl1 = 3.05*0.001*(5733-(6.99*mw)-pa);         // heat loss diff. through skin
+        if (mw > 58.15)     
+        {
+        	hl2 = 0.42 * (mw-58.15);                            // heat loss by sweating (comfort)
+		}
+        else
+        {
+            hl2 = 0;
+        }
+        hl3 = 1.7 * 0.00001 * m * (5867-pa);          //‘ latent respiration heat loss  
+        hl4 = 0.0014 * m * (34-ta);                     //‘ dry respiration heat loss
+        hl5 = 3.96*fcl*((pow(xn,4))-pow(tra/100,4));               // heat loss by radiation
+        hl6 = fcl * hc * (tcl-ta);                                 //heat loss by convection
+        ts = 0.303 * exp(-0.036*m) + 0.028;                       //‘ thermal sensation trans. Coeff
+        PMV = ts * (mw-hl1-hl2-hl3-hl4-hl5-hl6);                           // predicted mean vote
+        PPD=100-95*exp(-0.03353*pow(PMV,4)-0.2179*pow(PMV,2));                    //predicted percentage dissat
+		cout<<"predicted mean vote (PMV)=  "<<PMV<<"\n"<<"predicted percent dissatisfied (PPD)=  "<<PPD<<endl<<endl;                          //
+}
+/*-----------------------------------------------------------------------------------------------*/
+int main()
+{
+	double m,w,mw,vel,ta,tr,fnps,pa,xn,xf,tra,icl1,fcl,hcf,hc,hcl,
+	hcn,taa,tcla,p1,p2,p3,p4,p5,n,eps,hl1,hl2,hl3,hl4,hl5,hl6,ts,PMV,PPD,PMV_test,tcl,o, ta_optimise,vel_optimise,clo,met,wme,rh,Tmin,Tmax;
+	int oo;
+	cout<<"You want to study steady state or transient state? If steady state rnter 1 , if the transient state inter 2"<<endl;
+	cin>>oo;
+	if (oo==1){
+    cout<<"please inter your intrinsic clothing insulation:        "	<<endl;
+   cin>>clo;
+   cout<<"please inter your  metabolic rate :        "	<<endl;
+	cin>>met;
+	cout<<"please inter your 	wme=0:        "	<<endl;
+	cin>>wme;
+	cout<<"please inter humidity:        "	<<endl;
+	cin>>rh;
+	cout<<"please inter air temperature:        "	<<endl;
+	cin>>ta;
+	cout<<"please inter mean radient temperature:        "	<<endl;
+	cin>>tr;
+	cout<<"please inter air velocity:        "	<<endl;
+	cin>>vel;
+	 ComfortconditionsPMV_PPD(clo,met, wme,rh,ta,tr,vel);
+	 cout<<"PMV criteria in the range of 0.5 to -05 indicate comfort and PPD close to 5 indicates comfort. If you are not in this range, comfort is not established."<<endl;
+} 
+else {
+	cout<<"please inter your intrinsic clothing insulation:        "	<<endl;
+cin>>clo;
+cout<<"please inter your  metabolic rate :        "	<<endl;
+	cin>>met;
+	cout<<"please inter your 	wme=0:        "	<<endl;
+	cin>>wme;
+	cout<<"please inter humidity:        "	<<endl;
+	cin>>rh;
+	cout<<"please inter  minimum air temperature:        "	<<endl;
+	cin>>Tmin;
+	cout<<"please inter maxiimum air temperature:        "	<<endl;
+	cin>>Tmax;
+	ofstream outfile;
+	
+	char PMVBEHINE[15];
+	sprintf(PMVBEHINE,"PMVBEHINEdocument.dat"); 
+	outfile.open(PMVBEHINE);	
+	for( vel=0;vel<=1.4;vel=vel+0.001)
+	{
+	PMV_test=10;
+	for(ta=Tmin;ta<=Tmax;ta=ta+0.001)
+	{
+		tr=ta;
+		fnps=exp(16.6536-4030.183/(ta+235));
+		pa=rh*10*fnps;
+		icl1=0.155*clo;
+		m=met*58.15;
+		w=wme*58.15;
+		mw=m-w;
+		if (icl1<0.078)
+		{
+			fcl=1+1.29*icl1;
+		}
+		else
+		{
+			fcl=1.05+0.645*icl1;
+		}
+		hcf=12.1*sqrt(vel);
+		taa=ta+273;
+		tra=tr+273;
+		tcla=taa+(35.5-ta)/(3.5*((6.45*icl1)+0.1));
+		p1 = icl1 * fcl;
+        p2 = p1 * 3.96;
+        p3 = p1 * 100;
+        p4 = p1 * taa;
+        p5 = 308.7 - 0.028 * mw +p2 * pow((tra/100),4);
+        xn = tcla / 100;
+        xf = 0;
+        n =0;
+        eps = 0.00015;
+        while (fabs(xn-xf)>eps && n<=150)
+        {
+        	if (n==0)
+        	{
+        		xf=xn;
+			}
+			xf=(xf+xn)/2;
+			hcn=2.38*(pow(fabs(100*xf-taa),0.25));
+			if (hcf>hcn)
+			{
+				hc=hcf;
+			}
+			else
+			{
+				hc=hcn;
+			}
+			xn=(p5+p4*hc-p2*(pow(xf,4)))/(100+(p3*hc));
+			n=n+1;
+		}
+		tcl=100*xn-273;
+        hl1 = 3.05*0.001*(5733-(6.99*mw)-pa);
+        if (mw > 58.15)
+        {
+        	hl2 = 0.42 * (mw-58.15);
+		}
+        else
+        {
+            hl2 = 0;
+        }
+        hl3 = 1.7 * 0.00001 * m * (5867-pa);
+ 
+        hl4 = 0.0014 * m * (34-ta);
+                 
+        hl5 = 3.96*fcl*((pow(xn,4))-pow(tra/100,4));
+        
+        hl6 = fcl * hc * (tcl-ta);
+        
+        ts = 0.303 * exp(-0.036*m) + 0.028;
+        
+        PMV = ts * (mw-hl1-hl2-hl3-hl4-hl5-hl6);
+        PMV=abs(PMV);
+    	if (PMV<PMV_test)
+	    {
+		PMV_test=PMV;
+	    ta_optimise=ta;
+	    vel_optimise=vel;
+	    }
+    }
+	outfile<<"\n"<<ta_optimise<<"   "<<vel_optimise;
+    }
+}
+    return 0;
+}
+
